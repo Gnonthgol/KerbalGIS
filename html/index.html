@@ -40,28 +40,41 @@
 		}
 		
 		var currentBody = "Kerbin";
+		var satLayer;
+		var biomeLayer;
+		var hillLayer;
+		var layerControl;
 	
-		var satLayer = L.tileLayer('http://localhost:8080/tile/'+currentBody+'/sat/{z}/{x}/{y}.png', {
-			maxZoom: 18,
-		});
-		var biomeLayer = L.tileLayer('http://localhost:8080/tile/'+currentBody+'/biome/{z}/{x}/{y}.png', {
-			maxZoom: 18,
-			opacity: 0.5,
-		});
-		var hillLayer = L.tileLayer('http://localhost:8080/tile/'+currentBody+'/hillshading/{z}/{x}/{y}.png', {
-			maxZoom: 18,
-			opacity: 0.5,
-		});
-		
-		
 		var map = L.map('map', {
-    		center: new L.LatLng(0, 0),
-    		zoom: 4,
+    		crs: L.CRS.EPSG4326,
 		});
 		
-		map.addLayer(satLayer);
+		map.on('bodychange', function(e){
+			if (satLayer) map.removeLayer(satLayer);
+			satLayer = L.tileLayer('/tile/'+currentBody+'/sat/{z}/{x}/{y}.png', {
+				maxZoom: 18,
+			});
+			if (biomeLayer) map.removeLayer(biomeLayer);
+			biomeLayer = L.tileLayer('/tile/'+currentBody+'/biome/{z}/{x}/{y}.png', {
+				maxZoom: 18,
+				opacity: 0.5,
+			});
+			if (hillLayer) map.removeLayer(hillLayer);
+			hillLayer = L.tileLayer('/tile/'+currentBody+'/hillshading/{z}/{x}/{y}.png', {
+				maxZoom: 18,
+				opacity: 0.5,
+			});
 		
-		L.control.layers({}, {"Satellite": satLayer, "Biomes": biomeLayer, "Hillshading": hillLayer}).addTo(map);
+			map.addLayer(satLayer);
+			
+			if (layerControl) map.removeControl(layerControl);
+			layerControl = L.control.layers({}, {"Satellite": satLayer, "Biomes": biomeLayer, "Hillshading": hillLayer});
+			map.addControl(layerControl);
+			
+			map.setView(new L.LatLng(0, 0), 4);
+		});
+		
+		map.fire('bodychange');
 		
 		var ajaxRequest=new XMLHttpRequest();
 		if (ajaxRequest==null) {
@@ -69,25 +82,53 @@
 		}
 		
 		var legend = L.control({position: 'bottomright'});
+		var bodyswitcher = L.control({position: 'topright'});
 		var bodyInfo;
 		
 		ajaxRequest.onreadystatechange = function () {
 			if (ajaxRequest.readyState==4 && ajaxRequest.status==200) {
 				bodyInfo=eval("(" + ajaxRequest.responseText + ")");
 				legend.addTo(map);
+				bodyswitcher.addTo(map);
 			}
 		};
-		ajaxRequest.open('GET', "http://localhost:8080/info.json", true);
+		ajaxRequest.open('GET', "/info.json", true);
 		ajaxRequest.send(null);
 
 		legend.onAdd = function (map) {
 			var div = L.DomUtil.create('div', 'info legend');
-			var labels = [];
-			var biomes = bodyInfo[currentBody].biomes;
-			for (var i = 0; i < biomes.length; i++) {
-				labels.push('<i style="background:' + biomes[i].color + '"></i> ' + biomes[i].name);
+			var onBodyChange = function(){
+				var labels = [];
+				var biomes = bodyInfo[currentBody].biomes;
+				for (var i = 0; i < biomes.length; i++) {
+					labels.push('<i style="background:' + biomes[i].color + '"></i> ' + biomes[i].name);
+				}
+				div.innerHTML = labels.join('<br>');
 			}
-			div.innerHTML = labels.join('<br>');
+			
+			map.on('bodychange', onBodyChange);
+			onBodyChange();
+			
+			return div;
+		};
+		
+		bodyswitcher.onAdd = function (map) {
+			var div = L.DomUtil.create('div', 'info bodychanger');
+			
+			var select = L.DomUtil.create('select', '', div);
+			var options = [];
+			var bodies = Object.keys(bodyInfo);
+			for (var i = 0; i < bodies.length; i++) {
+				options.push('<option value="' + bodies[i] + '"> ' + bodies[i]);
+			}
+			select.innerHTML = options.join('');
+			select.value = currentBody;
+			
+			select.onchange = function(){
+				var body = select.value;
+				currentBody = body;
+				map.fire('bodychange');
+			};
 			
 			return div;
 		};
