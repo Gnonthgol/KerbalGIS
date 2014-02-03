@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Threading;
 using System.Collections;
@@ -77,8 +78,8 @@ namespace KerbalGIS
 			if (request == "/")
 				request = "/index.html";
 			try {
-				byte[] ret = File.ReadAllBytes<HTTPServer> (request);
-				response.StatusCode = 200;
+				byte[] ret = readBytes(request);
+				response.StatusCode = ret==null?404:200;
 				response.Close (ret, false);
 			} catch (Exception) {
 				response.StatusCode = 404;
@@ -191,6 +192,18 @@ namespace KerbalGIS
 			HttpListenerResponse response = context.Response;
 			response.StatusCode = 404;
 			response.Close ();
+		}
+
+		public byte[] readBytes (string file)
+		{
+			string dir = Path.GetDirectoryName(IOUtils.GetFilePathFor(typeof(HTTPServer), file));
+			string path = Path.Combine(dir, "www" + file);
+
+			if (System.IO.File.Exists (path)) {
+				return System.IO.File.ReadAllBytes (path);
+			} else {
+				return null;
+			}
 		}
 	}
 }
