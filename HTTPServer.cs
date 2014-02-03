@@ -18,8 +18,12 @@ namespace KerbalGIS
 
 		public HTTPServer ()
 		{
+			size = KerbalGIS.config.GetValue("defaultTileSize", 256);
+
 			listener = new HttpListener ();
-			listener.Prefixes.Add ("http://localhost:8080/");
+			foreach (string prefix in KerbalGIS.config.GetValue("prefix", "http://localhost:8080/").Split(new char[]{','})) {
+				listener.Prefixes.Add (prefix);
+			}
 			listener.Start ();
 			listener.BeginGetContext (new AsyncCallback (httpCallback), this);
 		}
@@ -172,13 +176,19 @@ namespace KerbalGIS
 				response.ContentType = "image/png";
 				response.Close (ret, false);
 
-				if (deltaTime == 0.0f)
+				if (deltaTime == 0.0f) {
 					deltaTime = Time.realtimeSinceStartup - start;
-				deltaTime = (Time.realtimeSinceStartup - start) * 0.1f + deltaTime * 0.9f;
-				if (deltaTime > 0.5 && size > 16) {
+				} else {
+					float a = 1.0f/KerbalGIS.config.GetValue("tileSmoothing", 10);
+					deltaTime = (Time.realtimeSinceStartup - start) * a + deltaTime * (1-a);
+				}
+
+				float dT = 1.0f/KerbalGIS.config.GetValue("tilesPerSecond", 4);
+				int minSize = KerbalGIS.config.GetValue("minTileSize", 16);
+				if (deltaTime > dT && size > minSize) {
 					size >>= 1;
 					deltaTime /= 4;
-				} else if (deltaTime < 0.1 && size < 256) {
+				} else if (deltaTime < dT/4 && size < 256) {
 					size <<= 1;
 					deltaTime *= 4;
 				}
