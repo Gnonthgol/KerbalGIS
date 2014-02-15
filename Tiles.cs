@@ -11,7 +11,7 @@ namespace KerbalGIS
 		{
 			if (body.pqsController == null)
 				return null;
-			initMaps (body);
+
 			size = getSize (body, size, z);
 			TileData data = getTileData(body, x, y, z, size);
 			size = data.size;
@@ -78,6 +78,7 @@ namespace KerbalGIS
 
 			if (ret == null || ret.size < size) {
 				ret = new TileData (size);
+				initMaps (body);
 
 				for (int x = 0; x < size; x++) {
 					for (int y = 0; y < size; y++) {
@@ -88,6 +89,7 @@ namespace KerbalGIS
 						ret.color [y * size + x] = buildData.vertColor;
 					}
 				}
+				endMaps (body);
 
 				tileDataCache[args] = ret;
 			}
@@ -114,14 +116,24 @@ namespace KerbalGIS
 			return r;
 		}
 
+		private static bool AllowScatter;
 		public static void initMaps (CelestialBody body)
 		{
 			PQS pqs = body.pqsController;
+			AllowScatter = PQS.Global_AllowScatter;
 			PQS.Global_AllowScatter = false;
 			pqs.isBuildingMaps = true;
 			pqs.isFakeBuild = true;
 			typeof(PQS).InvokeMember ("SetupMods", BindingFlags.InvokeMethod | BindingFlags.Instance | BindingFlags.NonPublic, null, pqs, null);
 			typeof(PQS).InvokeMember ("SetupBuildDelegates", BindingFlags.InvokeMethod | BindingFlags.Instance | BindingFlags.NonPublic, null, pqs, new object[]{true});
+		}
+
+		public static void endMaps (CelestialBody body)
+		{
+			PQS pqs = body.pqsController;
+			PQS.Global_AllowScatter = AllowScatter;
+			pqs.isBuildingMaps = false;
+			pqs.isFakeBuild = false;
 		}
 
 		public static PQS.VertexBuildData getBuildData (CelestialBody body, double lat, double lon)
